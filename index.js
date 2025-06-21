@@ -27,28 +27,10 @@ const ABI = [
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "name": "pendingOrders",
-    "outputs": [
-      { "internalType": "address", "name": "user", "type": "address" },
-      { "internalType": "uint256", "name": "assetIndex", "type": "uint256" },
-      { "internalType": "uint256", "name": "usdSize", "type": "uint256" },
-      { "internalType": "uint256", "name": "leverage", "type": "uint256" },
-      { "internalType": "bool", "name": "isLong", "type": "bool" },
-      { "internalType": "uint256", "name": "slPrice", "type": "uint256" },
-      { "internalType": "uint256", "name": "tpPrice", "type": "uint256" },
-      { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
   }
 ];
 
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.get("/execute-db", async (req, res) => {
   const limit = parseInt(req.query.limit);
@@ -63,23 +45,13 @@ app.get("/execute-db", async (req, res) => {
     .order("order_id", { ascending: true })
     .limit(limit);
 
-  if (error) {
-    console.error("❌ Supabase error:", error.message);
-    return res.status(500).json({ error: "Database error" });
-  }
+  if (error) return res.status(500).json({ error: "Supabase error" });
 
   const results = [];
 
   for (const row of rows) {
     const i = row.order_id;
     try {
-      const order = await contract.pendingOrders(i);
-      if (order.user === "0x0000000000000000000000000000000000000000") {
-        await supabase.from("pending_orders").update({ is_active: false }).eq("order_id", i);
-        results.push({ orderId: i, status: "skipped", reason: "deleted" });
-        continue;
-      }
-
       const proofRes = await fetch("https://multiproof-production.up.railway.app/proof");
       const proofData = await proofRes.json();
       const proof = proofData.proof;
@@ -89,18 +61,12 @@ app.get("/execute-db", async (req, res) => {
         continue;
       }
 
-      const gasEstimate = await contract.estimateGas.executePendingOrder(i, proof);
-      const tx = await contract.executePendingOrder(i, proof, {
-        gasLimit: gasEstimate.mul(2)
-      });
+      const tx = await contract.executePendingOrder(i, proof);
       await tx.wait();
 
       await supabase.from("pending_orders").update({ is_active: false }).eq("order_id", i);
-      console.log(`✅ Executed order #${i} | Tx: ${tx.hash}`);
       results.push({ orderId: i, status: "executed", txHash: tx.hash });
-
     } catch (err) {
-      console.error(`❌ Error executing order #${i}:`, err.reason || err.message);
       results.push({ orderId: i, status: "error", reason: err.reason || err.message });
     }
   }
@@ -109,5 +75,5 @@ app.get("/execute-db", async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🟢 API listening at http://localhost:${port}`);
+  console.log(`🟢 API listening on port ${port}`);
 });
