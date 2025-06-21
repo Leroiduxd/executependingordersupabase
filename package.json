@@ -1,11 +1,12 @@
 {
-  "name": "fetch-orders",
-  "type": "module",
+  "name": "supabase-orders-api",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "start": "node fetchOrders.js"
+    "start": "node server.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.5"
+    "@supabase/supabase-js": "^2.39.5",
+    "express": "^4.19.2"
   }
 }
